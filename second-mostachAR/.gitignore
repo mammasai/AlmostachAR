@@ -1,0 +1,9 @@
+﻿__pycache__/
+.env
+venv/
+*.pyc
+data/processed/*
+!data/processed/.gitkeep
+knowledge_base/vector_store/*
+!knowledge_base/vector_store/.gitkeep
+.env
