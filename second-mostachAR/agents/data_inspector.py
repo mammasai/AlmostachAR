@@ -1,6 +1,4 @@
-"""
- فحص وتشخيص جودة الداتاسيت العربي قبل أي معالجة
-"""
+# وكيل فحص وتشخيص جودة الداتاسيت العربي
 
 import os
 import sys
@@ -14,9 +12,12 @@ from config import get_llm
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
 
-
 @tool("Encoding Checker")
 def check_encoding(file_path: str) -> str:
+    """
+    يفحص ترميز الملف المُدخل ويتأكد إذا كان UTF-8 أو لا.
+    المدخل: مسار الملف (file_path)
+    """
     try:
         with open(file_path, "rb") as f:
             raw_data = f.read(100000)
@@ -36,9 +37,13 @@ def check_encoding(file_path: str) -> str:
     except Exception as e:
         return f"خطأ أثناء فحص الترميز: {str(e)}"
 
-
 @tool("Arabic Word Distribution Analyzer")
 def analyze_word_distribution(file_path: str, text_column: str = None) -> str:
+    """
+    يحلل توزيع الكلمات العربية في الملف، نسبة الكلمات العربية مقابل غير العربية،
+    وأكثر الكلمات تكراراً.
+    المدخل: مسار الملف (file_path) واسم العمود النصي (text_column) اختياري.
+    """
     try:
         if file_path.endswith(".csv"):
             df = pd.read_csv(file_path)
@@ -87,9 +92,12 @@ def analyze_word_distribution(file_path: str, text_column: str = None) -> str:
     except Exception as e:
         return f"خطأ أثناء تحليل توزيع الكلمات: {str(e)}"
 
-
 @tool("Vocabulary Density Calculator")
 def calculate_vocabulary_density(file_path: str, text_column: str = None) -> str:
+    """
+    يحسب نسبة الكلمات الفريدة إلى إجمالي الكلمات (Vocabulary Density)،
+    وهو مؤشر مهم لتنوع المحتوى اللغوي في الداتاسيت.
+    """
     try:
         if file_path.endswith(".csv"):
             df = pd.read_csv(file_path)
@@ -116,11 +124,11 @@ def calculate_vocabulary_density(file_path: str, text_column: str = None) -> str
         density = unique_words / total_words if total_words > 0 else 0
 
         if density > 0.5:
-            interpretation = "تنوع لغوي مرتفع جداً — قد يشير لبيانات غير متجانسة أو ضوضاء."
+            interpretation = "تنوع لغوي مرتفع جداً - قد يشير لبيانات غير متجانسة أو ضوضاء."
         elif density > 0.3:
             interpretation = "تنوع لغوي جيد ومتوازن."
         else:
-            interpretation = "تنوع لغوي منخفض — البيانات متكررة، قد تحتاجي مصادر إضافية."
+            interpretation = "تنوع لغوي منخفض - البيانات متكررة، قد تحتاجي مصادر إضافية."
 
         return f"""
 كثافة المفردات (Vocabulary Density):
@@ -131,7 +139,6 @@ def calculate_vocabulary_density(file_path: str, text_column: str = None) -> str
 """
     except Exception as e:
         return f"خطأ أثناء حساب كثافة المفردات: {str(e)}"
-
 
 def create_data_inspector_agent():
     llm = get_llm(temperature=0.2)
@@ -144,9 +151,9 @@ def create_data_inspector_agent():
             "تشخيصي واضح بالعربية يوجّه المستخدم للخطوة التالية."
         ),
         backstory=(
-            "أنتِ خبير في معالجة اللغة العربية الطبيعية (Arabic NLP)، "
-            "عملت لسنوات في تجهيز داتاسيتات عربية لمشاريع تعلم آلي. "
-            "تعرف تماماً المشاكل الشائعة في البيانات العربية: مشاكل الترميز، "
+            "أنتِ خبيرة في معالجة اللغة العربية الطبيعية (Arabic NLP)، "
+            "عملتِ لسنوات في تجهيز داتاسيتات عربية لمشاريع تعلم آلي. "
+            "تعرفين تماماً المشاكل الشائعة في البيانات العربية: مشاكل الترميز، "
             "اختلاط اللهجات مع الفصحى، والتكرار المفرط. أسلوبك مباشر وعملي."
         ),
         tools=[check_encoding, analyze_word_distribution, calculate_vocabulary_density],
@@ -155,17 +162,15 @@ def create_data_inspector_agent():
     )
     return agent
 
-
 def create_inspection_task(agent, file_path: str):
     task = Task(
         description=(
-            f"افحص الملف الموجود في المسار التالي: {file_path}\n"
-            "1. تحقق من ترميز الملف (يجب أن يكون UTF-8).\n"
-            "2. حلل توزيع الكلمات العربية ونسبتها.\n"
-            "3. احسب كثافة المفردات وفسريها.\n"
-            "4. اكتب تقريراً استشارياً نهائياً بالعربية يلخص كل النتائج "
-            "ويقترح خطوات عملية للمستخدم (مثلاً: هل البيانات جاهزة للمعالجة، "
-            "أم تحتاج تنظيف إضافي)."
+            f"افحصي الملف الموجود في المسار التالي: {file_path}\n"
+            "1. تحققي من ترميز الملف (يجب أن يكون UTF-8).\n"
+            "2. حللي توزيع الكلمات العربية ونسبتها.\n"
+            "3. احسبي كثافة المفردات وفسريها.\n"
+            "4. اكتبي تقريراً استشارياً نهائياً بالعربية يلخص كل النتائج "
+            "ويقترح خطوات عملية للمستخدم."
         ),
         expected_output=(
             "تقرير منظم بالعربية يحتوي على: حالة الترميز، إحصائيات الكلمات، "
@@ -175,7 +180,6 @@ def create_inspection_task(agent, file_path: str):
     )
     return task
 
-
 if __name__ == "__main__":
     test_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -184,7 +188,6 @@ if __name__ == "__main__":
 
     if not os.path.exists(test_file_path):
         print(f"الملف التجريبي غير موجود في: {test_file_path}")
-        print("ضع ملف CSV أو TXT في مجلد data/raw/ جرب مرة أخرى.")
     else:
         inspector = create_data_inspector_agent()
         task = create_inspection_task(inspector, test_file_path)

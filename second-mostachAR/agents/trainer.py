@@ -1,6 +1,4 @@
-"""
- تحضير وتشغيل عملية Fine-tuning للنموذج المُختار
-"""
+# وكيل تحضير وتوليد سكريبت تدريب النموذج
 
 import os
 import sys
@@ -12,7 +10,6 @@ from config import get_llm
 
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
-
 
 def _read_any_file(file_path):
     if file_path.endswith(".csv"):
@@ -26,17 +23,22 @@ def _read_any_file(file_path):
     else:
         raise ValueError("صيغة الملف غير مدعومة. استخدمي CSV, Excel, أو TXT.")
 
-
 @tool("Dataset Splitter")
 def split_dataset(file_path: str, text_column: str = None, label_column: str = None,
                    train_ratio: float = 0.8, output_dir: str = None) -> str:
+    """
+    يقسّم الداتاسيت إلى مجموعتي تدريب (train) واختبار (test) بنسبة محددة،
+    ويحفظهما كملفين منفصلين جاهزين للتدريب.
+    المدخلات: file_path, text_column (اختياري), label_column (اختياري),
+    train_ratio (نسبة التدريب، افتراضي 0.8), output_dir (اختياري)
+    """
     try:
         df = _read_any_file(file_path)
 
         if text_column is None or text_column not in df.columns:
             text_columns = df.select_dtypes(include="object").columns
             if len(text_columns) == 0:
-                return "لم يتم العثور على عمود نصي."
+                return " لم يتم العثور على عمود نصي."
             text_column = text_columns[0]
 
         df = df.sample(frac=1, random_state=42).reset_index(drop=True)
@@ -54,21 +56,26 @@ def split_dataset(file_path: str, text_column: str = None, label_column: str = N
         test_df.to_csv(test_path, index=False, encoding="utf-8-sig")
 
         return (
-            f"تم تقسيم الداتاسيت بنجاح:\n"
+            f" تم تقسيم الداتاسيت بنجاح:\n"
             f"- عدد صفوف التدريب: {len(train_df)} → {train_path}\n"
             f"- عدد صفوف الاختبار: {len(test_df)} → {test_path}\n"
             f"- عمود النص المستخدم: {text_column}"
         )
 
     except Exception as e:
-        return f"خطأ أثناء تقسيم الداتاسيت: {str(e)}"
-
+        return f" خطأ أثناء تقسيم الداتاسيت: {str(e)}"
 
 @tool("Training Script Generator")
 def generate_training_script(model_hf_path: str, train_path: str, test_path: str,
                               text_column: str = "text", label_column: str = "label",
                               num_labels: int = 2, output_script_path: str = None,
                               epochs: int = 3, batch_size: int = 8) -> str:
+    """
+    يكتب سكريبت بايثون كامل وجاهز للتشغيل يقوم بـ Fine-tuning للنموذج المحدد
+    باستخدام مكتبة Hugging Face Transformers، ويحفظه كملف .py.
+    المدخلات: model_hf_path (مسار النموذج على Hugging Face)، train_path، test_path،
+    text_column، label_column، num_labels (عدد الفئات)، epochs، batch_size
+    """
     try:
         if output_script_path is None:
             output_script_path = os.path.join(
@@ -169,20 +176,23 @@ if __name__ == "__main__":
             f.write(script_content)
 
         return (
-            f"تم توليد سكريبت التدريب بنجاح في: {output_script_path}\n"
+            f" تم توليد سكريبت التدريب بنجاح في: {output_script_path}\n"
             f"النموذج المستخدم: {model_hf_path}\n"
             f"عدد الحقب (epochs): {epochs}\n"
             f"حجم الدفعة (batch size): {batch_size}\n"
-            f"ملاحظة: هذا السكريبت يحتاج عمود اسمه '{label_column}' في البيانات "
+            f" ملاحظة: هذا السكريبت يحتاج عمود اسمه '{label_column}' في البيانات "
             f"يحتوي على الفئات (labels) كأرقام صحيحة تبدأ من 0."
         )
 
     except Exception as e:
-        return f"خطأ أثناء توليد سكريبت التدريب: {str(e)}"
-
+        return f" خطأ أثناء توليد سكريبت التدريب: {str(e)}"
 
 @tool("Training Config Validator")
 def validate_training_readiness(file_path: str, label_column: str = None) -> str:
+    """
+    يتحقق إذا كانت البيانات جاهزة فعلياً للتدريب (وجود عمود labels، عدد كافٍ من الصفوف،
+    توازن الفئات) قبل توليد سكريبت التدريب، لتفادي أخطاء لاحقة.
+    """
     try:
         df = _read_any_file(file_path)
         issues = []
@@ -208,16 +218,15 @@ def validate_training_readiness(file_path: str, label_column: str = None) -> str
             issues.append("لم يتم تحديد عمود الفئات (label_column). لا يمكن تقييم جاهزية التدريب بالكامل بدونه.")
 
         if not issues:
-            return f"البيانات جاهزة للتدريب. عدد الصفوف: {len(df)}."
+            return f" البيانات جاهزة للتدريب. عدد الصفوف: {len(df)}."
         else:
-            report = "ملاحظات قبل التدريب:\n"
+            report = " ملاحظات قبل التدريب:\n"
             for issue in issues:
                 report += f"- {issue}\n"
             return report
 
     except Exception as e:
-        return f"خطأ أثناء التحقق من جاهزية البيانات: {str(e)}"
-
+        return f" خطأ أثناء التحقق من جاهزية البيانات: {str(e)}"
 
 def create_trainer_agent():
     llm = get_llm(temperature=0.2)
@@ -239,7 +248,6 @@ def create_trainer_agent():
         verbose=True,
     )
     return agent
-
 
 def create_training_prep_task(agent, file_path, model_hf_path, text_column="text",
                                label_column="label", num_labels=2):
@@ -267,7 +275,6 @@ def create_training_prep_task(agent, file_path, model_hf_path, text_column="text
     )
     return task
 
-
 if __name__ == "__main__":
     test_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -275,9 +282,10 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(test_file_path):
-        print(f"الملف التجريبي غير موجود في: {test_file_path}")
+        print(f" الملف التجريبي غير موجود في: {test_file_path}")
     else:
         trainer = create_trainer_agent()
+        # مثال: نموذج AraBERT اللي اقترحه model_advisor في التجربة السابقة
         task = create_training_prep_task(
             trainer,
             test_file_path,

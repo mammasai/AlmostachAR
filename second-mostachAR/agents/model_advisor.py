@@ -1,6 +1,4 @@
-"""
- اقتراح أفضل نموذج لغوي عربي حسب طبيعة المهمة وخصائص البيانات
-"""
+# وكيل اقتراح أفضل نموذج لغوي عربي حسب المهمة والبيانات
 
 import os
 import sys
@@ -11,7 +9,6 @@ from config import get_llm
 
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
-
 
 MODELS_KNOWLEDGE_BASE = {
     "arabert": {
@@ -46,14 +43,12 @@ MODELS_KNOWLEDGE_BASE = {
     },
 }
 
-
 DIALECT_MARKERS = {
     "EGY": ["مش", "ازيك", "عايز", "عاوز", "دلوقتي", "كده", "ايه", "علشان", "خالص", "بتاع"],
     "GLF": ["شلون", "وايد", "شنو", "يبا", "زين", "ابغى", "احين", "مب", "ماكو"],
     "LEV": ["شو", "هيك", "منيح", "كتير", "هلق", "ليش", "بدي", "تبعي"],
-    "alg": ["واش", "بزاف", "زعما", "دابا", "غادي", "نتا", "شحال", "بصح"],
+    "MAG": ["واش", "بزاف", "زعما", "دابا", "غادي", "نتا", "شحال", "بصح"],
 }
-
 
 def _read_any_file(file_path):
     if file_path.endswith(".csv"):
@@ -67,21 +62,26 @@ def _read_any_file(file_path):
     else:
         raise ValueError("صيغة الملف غير مدعومة. استخدمي CSV, Excel, أو TXT.")
 
-
 @tool("Dialect Identifier")
 def identify_dialect(file_path: str, text_column: str = None, sample_size: int = 50) -> str:
+    """
+    يحلل عينة من النصوص لتقدير إذا كانت فصحى (MSA) أو لهجة عامية، وأي لهجة على الأرجح
+    (مصرية EGY، خليجية GLF، شامية LEV، مغاربية MAG)، بالاعتماد على مؤشرات لغوية شائعة.
+    ملاحظة: هذا تقدير heuristic وليس نموذج DID رسمي، لأن مكون Dialect ID في CAMeL Tools
+    غير متاح على أنظمة Windows.
+    """
     try:
         df = _read_any_file(file_path)
 
         if text_column is None or text_column not in df.columns:
             text_columns = df.select_dtypes(include="object").columns
             if len(text_columns) == 0:
-                return "لم يتم العثور على عمود نصي."
+                return " لم يتم العثور على عمود نصي."
             text_column = text_columns[0]
 
         sample_texts = df[text_column].dropna().astype(str).head(sample_size).tolist()
         if not sample_texts:
-            return "لا توجد نصوص كافية للتحليل."
+            return " لا توجد نصوص كافية للتحليل."
 
         dialect_hits = {k: 0 for k in DIALECT_MARKERS}
         msa_count = 0
@@ -96,7 +96,7 @@ def identify_dialect(file_path: str, text_column: str = None, sample_size: int =
                 msa_count += 1
 
         total = len(sample_texts)
-        report = "تقرير تقدير اللهجة (بمنهج المؤشرات اللغوية):\n"
+        report = " تقرير تقدير اللهجة (بمنهج المؤشرات اللغوية):\n"
         report += f"- حجم العينة المفحوصة: {total} نص\n\n"
         report += "توزيع المؤشرات المكتشفة:\n"
         report += f"  - فصحى/غير محدد (MSA): {msa_count} ({msa_count/total*100:.1f}%)\n"
@@ -105,21 +105,24 @@ def identify_dialect(file_path: str, text_column: str = None, sample_size: int =
 
         all_counts = {"MSA": msa_count, **dialect_hits}
         dominant = max(all_counts, key=all_counts.get)
-        report += f"\nالفئة المهيمنة (تقديرية): {dominant}"
-        report += "\nملاحظة: هذا تقدير مبني على مؤشرات لغوية شائعة، وليس نموذج DID متقدم (غير متاح على Windows)."
+        report += f"\n الفئة المهيمنة (تقديرية): {dominant}"
+        report += "\n ملاحظة: هذا تقدير مبني على مؤشرات لغوية شائعة، وليس نموذج DID متقدم (غير متاح على Windows)."
 
         return report
 
     except Exception as e:
-        return f"خطأ أثناء تقدير اللهجة: {str(e)}"
-
+        return f" خطأ أثناء تقدير اللهجة: {str(e)}"
 
 @tool("Arabic Models Knowledge Base")
 def query_models_knowledge_base(query_type: str = "all") -> str:
+    """
+    يرجع معلومات عن النماذج العربية المتاحة (AraBERT, CAMeLBERT بأنواعه, MarBERT)
+    مع أفضل استخداماتها.
+    """
     if query_type.lower() == "all":
-        report = "قاعدة معرفية بالنماذج العربية المتاحة:\n\n"
+        report = " قاعدة معرفية بالنماذج العربية المتاحة:\n\n"
         for key, info in MODELS_KNOWLEDGE_BASE.items():
-            report += f"{info['full_name']} ({info['hf_path']})\n"
+            report += f" {info['full_name']} ({info['hf_path']})\n"
             report += f"   الأنسب لـ: {', '.join(info['best_for'])}\n"
             report += f"   ملاحظة: {info['notes']}\n\n"
         return report
@@ -128,17 +131,19 @@ def query_models_knowledge_base(query_type: str = "all") -> str:
     if key in MODELS_KNOWLEDGE_BASE:
         info = MODELS_KNOWLEDGE_BASE[key]
         return (
-            f"{info['full_name']} ({info['hf_path']})\n"
+            f" {info['full_name']} ({info['hf_path']})\n"
             f"الأنسب لـ: {', '.join(info['best_for'])}\n"
             f"ملاحظة: {info['notes']}"
         )
     else:
         available = ", ".join(MODELS_KNOWLEDGE_BASE.keys())
-        return f"النموذج '{query_type}' غير موجود في القاعدة. النماذج المتاحة: {available}"
-
+        return f" النموذج '{query_type}' غير موجود في القاعدة. النماذج المتاحة: {available}"
 
 @tool("Model Recommendation Engine")
 def recommend_model(task_type: str, dominant_dialect: str = "MSA") -> str:
+    """
+    يقترح النموذج الأنسب بناءً على نوع المهمة واللهجة المهيمنة في البيانات.
+    """
     task_type = task_type.lower()
     is_msa = dominant_dialect.upper() == "MSA"
 
@@ -160,12 +165,11 @@ def recommend_model(task_type: str, dominant_dialect: str = "MSA") -> str:
 
     info = MODELS_KNOWLEDGE_BASE[recommendation]
     return (
-        f"التوصية النهائية: {info['full_name']}\n"
+        f" التوصية النهائية: {info['full_name']}\n"
         f"المسار على Hugging Face: {info['hf_path']}\n"
         f"سبب الاختيار: {reason}\n"
         f"استخدامات أخرى للنموذج: {', '.join(info['best_for'])}"
     )
-
 
 def create_model_advisor_agent():
     llm = get_llm(temperature=0.3)
@@ -187,7 +191,6 @@ def create_model_advisor_agent():
     )
     return agent
 
-
 def create_advisory_task(agent, file_path, task_type="classification"):
     task = Task(
         description=(
@@ -206,7 +209,6 @@ def create_advisory_task(agent, file_path, task_type="classification"):
     )
     return task
 
-
 if __name__ == "__main__":
     test_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -214,7 +216,7 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(test_file_path):
-        print(f"الملف التجريبي غير موجود في: {test_file_path}")
+        print(f" الملف التجريبي غير موجود في: {test_file_path}")
     else:
         advisor = create_model_advisor_agent()
         task = create_advisory_task(advisor, test_file_path, task_type="classification")

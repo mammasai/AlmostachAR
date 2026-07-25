@@ -1,7 +1,5 @@
-"""
-واجهة المحادثة الرئيسية   
-المستخدم يكتب رسائل طبيعية، ووكيل "المدير" يفهم القصد ويستدعي الخبير  المناسب
-"""
+# واجهة المحادثة الرئيسية لـ AlmostachAR
+
 import os
 import sys
 import uuid
@@ -13,7 +11,6 @@ from agents.orchestrator import run_chat_turn
 
 st.set_page_config(
     page_title="AlmostachAR — المستشار",
-    page_icon="",
     layout="centered",
 )
 
@@ -92,7 +89,6 @@ with st.sidebar:
 
     st.divider()
 
-
     st.subheader("رفع ملف بيانات")
     uploaded_file = st.file_uploader(
         "اختاري ملف CSV, Excel, PDF, DOCX, DOC, أو TXT",
@@ -136,17 +132,17 @@ with st.sidebar:
             st.session_state.current_conversation_id = conv_id
             st.rerun()
 
-st.title("almostachAR")
+st.title("AlmostachAR")
 
 if not current["messages"]:
     st.markdown(
         """
         <div class="intro-block">
-        أهلاً بيك  أنا <b>AlmostachAR</b>، مستشارك الذكي لبناء نماذج معالجة اللغة
+        أهلاً بيك، أنا <b>AlmostachAR</b>، مستشارك الذكي لبناء نماذج معالجة اللغة
         العربية الطبيعية
         <br><br>
-        تقدري تسألني أي سؤال عام، أو ترفع ملف بيانات من الشريط الجانبي
-        وتطلبي مني أفحصه، أنظفه، أقترح لك نموذج، أو أي شيء تحتاجه
+        تقدري تسألني أي سؤال عام، أو ترفعي ملف بيانات من الشريط الجانبي
+        وتطلبي مني أفحصه، أنظفه، أقترح لك نموذج، أو أي شيء تحتاجينه
         </div>
         """,
         unsafe_allow_html=True,
@@ -157,7 +153,7 @@ for message in current["messages"]:
         st.markdown(message["content"])
 
 
-user_input = st.chat_input("اكتب هنا...")
+user_input = st.chat_input("اكتبي هنا...")
 
 if user_input:
     if current["title"] == "محادثة جديدة":

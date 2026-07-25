@@ -1,6 +1,4 @@
-"""
- تقييم أداء النموذج المدرَّب وكتابة تقرير استشاري نهائي
-"""
+# وكيل تقييم أداء النموذج المدرَّب
 
 import os
 import sys
@@ -12,7 +10,6 @@ from config import get_llm
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
 
-
 def _read_any_file(file_path):
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
@@ -21,10 +18,14 @@ def _read_any_file(file_path):
     else:
         raise ValueError("صيغة الملف غير مدعومة. استخدمي CSV أو Excel.")
 
-
 @tool("Classification Metrics Calculator")
 def compute_classification_metrics(predictions_file: str, true_label_column: str = "true_label",
                                      predicted_label_column: str = "predicted_label") -> str:
+    """
+    يحسب مقاييس التقييم الأساسية (Accuracy, Precision, Recall, F1-Score) من ملف
+    يحتوي على عمودين: القيم الحقيقية والقيم المتوقعة من النموذج.
+    المدخلات: predictions_file (مسار الملف)، true_label_column، predicted_label_column
+    """
     try:
         from sklearn.metrics import (
             accuracy_score,
@@ -38,7 +39,7 @@ def compute_classification_metrics(predictions_file: str, true_label_column: str
 
         if true_label_column not in df.columns or predicted_label_column not in df.columns:
             return (
-                f"الأعمدة المطلوبة غير موجودة. الأعمدة المتاحة: {list(df.columns)}. "
+                f" الأعمدة المطلوبة غير موجودة. الأعمدة المتاحة: {list(df.columns)}. "
                 f"مطلوب: {true_label_column}, {predicted_label_column}"
             )
 
@@ -52,7 +53,7 @@ def compute_classification_metrics(predictions_file: str, true_label_column: str
 
         detailed_report = classification_report(y_true, y_pred, zero_division=0)
 
-        report = "مقاييس التقييم:\n"
+        report = " مقاييس التقييم:\n"
         report += f"- الدقة الإجمالية (Accuracy): {accuracy:.2%}\n"
         report += f"- الدقة الموزونة (Precision): {precision:.2%}\n"
         report += f"- الاستدعاء الموزون (Recall): {recall:.2%}\n"
@@ -63,19 +64,22 @@ def compute_classification_metrics(predictions_file: str, true_label_column: str
         return report
 
     except Exception as e:
-        return f"خطأ أثناء حساب المقاييس: {str(e)}"
-
+        return f" خطأ أثناء حساب المقاييس: {str(e)}"
 
 @tool("Confusion Matrix Analyzer")
 def analyze_confusion_matrix(predictions_file: str, true_label_column: str = "true_label",
                                predicted_label_column: str = "predicted_label") -> str:
+    """
+    يبني مصفوفة الالتباس (Confusion Matrix) ويحللها لتحديد أكثر الفئات
+    اللي بيتلخبط فيها النموذج مع بعضها.
+    """
     try:
         from sklearn.metrics import confusion_matrix
 
         df = _read_any_file(predictions_file)
 
         if true_label_column not in df.columns or predicted_label_column not in df.columns:
-            return f"الأعمدة المطلوبة غير موجودة. الأعمدة المتاحة: {list(df.columns)}"
+            return f" الأعمدة المطلوبة غير موجودة. الأعمدة المتاحة: {list(df.columns)}"
 
         y_true = df[true_label_column]
         y_pred = df[predicted_label_column]
@@ -83,7 +87,7 @@ def analyze_confusion_matrix(predictions_file: str, true_label_column: str = "tr
         labels = sorted(y_true.unique().tolist())
         cm = confusion_matrix(y_true, y_pred, labels=labels)
 
-        report = "مصفوفة الالتباس (Confusion Matrix):\n\n"
+        report = " مصفوفة الالتباس (Confusion Matrix):\n\n"
         report += "الفئات: " + ", ".join(str(l) for l in labels) + "\n\n"
 
         header = "الحقيقي \\ المتوقع".ljust(20) + "".join(str(l).ljust(10) for l in labels)
@@ -102,39 +106,42 @@ def analyze_confusion_matrix(predictions_file: str, true_label_column: str = "tr
 
         if confused_pair and max_confusion > 0:
             report += (
-                f"\nأكثر خلط ملاحظ: النموذج توقع '{confused_pair[1]}' بينما الحقيقة "
+                f"\n أكثر خلط ملاحظ: النموذج توقع '{confused_pair[1]}' بينما الحقيقة "
                 f"كانت '{confused_pair[0]}' في {max_confusion} حالة/حالات."
             )
         else:
-            report += "\nلا يوجد خلط ملحوظ بين الفئات."
+            report += "\n لا يوجد خلط ملحوظ بين الفئات."
 
         return report
 
     except Exception as e:
-        return f"خطأ أثناء تحليل مصفوفة الالتباس: {str(e)}"
-
+        return f" خطأ أثناء تحليل مصفوفة الالتباس: {str(e)}"
 
 @tool("Misclassification Sampler")
 def sample_misclassified_examples(predictions_file: str, text_column: str = "text",
                                     true_label_column: str = "true_label",
                                     predicted_label_column: str = "predicted_label",
                                     num_samples: int = 5) -> str:
+    """
+    يسحب عينة من الأمثلة اللي أخطأ فيها النموذج (توقع خاطئ) لعرضها كأمثلة توضيحية
+    في التقرير الاستشاري، لمساعدة المستخدم يفهم طبيعة الأخطاء.
+    """
     try:
         df = _read_any_file(predictions_file)
 
         required_cols = [text_column, true_label_column, predicted_label_column]
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
-            return f"أعمدة ناقصة: {missing}. الأعمدة المتاحة: {list(df.columns)}"
+            return f" أعمدة ناقصة: {missing}. الأعمدة المتاحة: {list(df.columns)}"
 
         misclassified = df[df[true_label_column] != df[predicted_label_column]]
 
         if len(misclassified) == 0:
-            return "لا توجد أمثلة مُصنَّفة خطأ — النموذج حقق دقة 100% على بيانات الاختبار."
+            return " لا توجد أمثلة مُصنَّفة خطأ — النموذج حقق دقة 100% على بيانات الاختبار."
 
         sample = misclassified.head(num_samples)
 
-        report = f"عينة من الأخطاء ({len(misclassified)} خطأ من أصل {len(df)}):\n\n"
+        report = f" عينة من الأخطاء ({len(misclassified)} خطأ من أصل {len(df)}):\n\n"
         for idx, row in sample.iterrows():
             text_preview = str(row[text_column])[:100]
             report += f"- النص: \"{text_preview}...\"\n"
@@ -146,8 +153,7 @@ def sample_misclassified_examples(predictions_file: str, text_column: str = "tex
         return report
 
     except Exception as e:
-        return f"خطأ أثناء سحب عينة الأخطاء: {str(e)}"
-
+        return f" خطأ أثناء سحب عينة الأخطاء: {str(e)}"
 
 def create_evaluator_agent():
     llm = get_llm(temperature=0.3)
@@ -176,7 +182,6 @@ def create_evaluator_agent():
     )
     return agent
 
-
 def create_evaluation_task(agent, predictions_file: str, text_column: str = "text",
                             true_label_column: str = "true_label",
                             predicted_label_column: str = "predicted_label"):
@@ -202,7 +207,6 @@ def create_evaluation_task(agent, predictions_file: str, text_column: str = "tex
     )
     return task
 
-
 if __name__ == "__main__":
     test_predictions_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -210,7 +214,7 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(test_predictions_path):
-        print(f"ملف التنبؤات التجريبي غير موجود في: {test_predictions_path}")
+        print(f" ملف التنبؤات التجريبي غير موجود في: {test_predictions_path}")
         print("سيتم إنشاء ملف تجريبي بسيط للتحقق من عمل الوكيل...")
 
         sample_data = pd.DataFrame({

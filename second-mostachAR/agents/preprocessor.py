@@ -1,6 +1,4 @@
-"""
- تنظيف ومعالجة النصوص العربية باستخدام CAMeL Tools
-"""
+# وكيل تنظيف ومعالجة النصوص العربية باستخدام CAMeL Tools
 
 import os
 import sys
@@ -21,7 +19,6 @@ from camel_tools.utils.normalize import (
 )
 from camel_tools.utils.dediac import dediac_ar
 
-
 def _read_file(file_path: str) -> pd.DataFrame:
     if file_path.endswith(".csv"):
         return pd.read_csv(file_path)
@@ -33,7 +30,6 @@ def _read_file(file_path: str) -> pd.DataFrame:
         return pd.DataFrame({"text": lines})
     else:
         raise ValueError("صيغة الملف غير مدعومة. استخدمي CSV, Excel, أو TXT.")
-
 
 def _write_file(df: pd.DataFrame, output_path: str):
     output_dir = os.path.dirname(output_path)
@@ -50,7 +46,6 @@ def _write_file(df: pd.DataFrame, output_path: str):
     else:
         raise ValueError("صيغة الملف غير مدعومة للحفظ.")
 
-
 def _detect_text_column(df: pd.DataFrame, text_column: str = None) -> str:
     if text_column and text_column in df.columns:
         return text_column
@@ -59,9 +54,11 @@ def _detect_text_column(df: pd.DataFrame, text_column: str = None) -> str:
         raise ValueError("لم يتم العثور على عمود نصي في الملف.")
     return text_columns[0]
 
-
 @tool("Repeated Characters Remover")
 def remove_repeated_chars(file_path: str, text_column: str = "", output_path: str = "") -> str:
+    """
+    يزيل تكرار الحروف غير الطبيعي في النصوص العربية (مثل 'جميييل' تصبح 'جميل').
+    """
     try:
         df = _read_file(file_path)
         col = _detect_text_column(df, text_column)
@@ -79,16 +76,18 @@ def remove_repeated_chars(file_path: str, text_column: str = "", output_path: st
 
         _write_file(df, output_path)
         return (
-            f"تم إزالة تكرار الحروف بنجاح. عدد الصفوف المعالجة: {len(df)}. "
+            f" تم إزالة تكرار الحروف بنجاح. عدد الصفوف المعالجة: {len(df)}. "
             f"الملف المُعالج محفوظ في: {output_path}"
         )
 
     except Exception as e:
-        return f"خطأ أثناء إزالة تكرار الحروف: {str(e)}"
-
+        return f" خطأ أثناء إزالة تكرار الحروف: {str(e)}"
 
 @tool("Arabic Text Normalizer")
 def normalize_arabic_text(file_path: str, text_column: str = "", output_path: str = "") -> str:
+    """
+    يطبّع النصوص العربية: توحيد أشكال الألف، الياء/الألف المقصورة، والتاء المربوطة/الهاء.
+    """
     try:
         df = _read_file(file_path)
         col = _detect_text_column(df, text_column)
@@ -110,16 +109,18 @@ def normalize_arabic_text(file_path: str, text_column: str = "", output_path: st
 
         _write_file(df, output_path)
         return (
-            f"تم تطبيع النصوص بنجاح. عدد الصفوف المعالجة: {len(df)}. "
+            f" تم تطبيع النصوص بنجاح. عدد الصفوف المعالجة: {len(df)}. "
             f"الملف المُعالج محفوظ في: {output_path}"
         )
 
     except Exception as e:
-        return f"خطأ أثناء التطبيع: {str(e)}"
-
+        return f" خطأ أثناء التطبيع: {str(e)}"
 
 @tool("Arabic Diacritics Remover")
 def remove_diacritics(file_path: str, text_column: str = "", output_path: str = "") -> str:
+    """
+    يزيل التشكيل (الحركات) من النصوص العربية باستخدام CAMeL Tools.
+    """
     try:
         df = _read_file(file_path)
         col = _detect_text_column(df, text_column)
@@ -132,16 +133,24 @@ def remove_diacritics(file_path: str, text_column: str = "", output_path: str = 
 
         _write_file(df, output_path)
         return (
-            f"تم إزالة التشكيل بنجاح. عدد الصفوف المعالجة: {len(df)}. "
+            f" تم إزالة التشكيل بنجاح. عدد الصفوف المعالجة: {len(df)}. "
             f"الملف المُعالج محفوظ في: {output_path}"
         )
 
     except Exception as e:
-        return f"خطأ أثناء إزالة التشكيل: {str(e)}"
-
+        return f" خطأ أثناء إزالة التشكيل: {str(e)}"
 
 @tool("Full Arabic Text Cleaner")
 def full_clean_pipeline(file_path: str, text_column: str = "", keep_diacritics: bool = False, output_path: str = "") -> str:
+    """
+    يطبّق خط أنابيب تنظيف كامل: إزالة تكرار الحروف، التطبيع، وإزالة التشكيل (اختياري).
+    هذه الأداة الأساسية اللي لازم تُستخدم في السيناريو العادي بدل استدعاء كل أداة لحالها.
+    المدخلات:
+    - file_path: مسار الملف
+    - text_column: اسم العمود النصي (اختياري)
+    - keep_diacritics: True للإبقاء على التشكيل (مفيد لمهام TTS)، False لإزالته (مفيد للتصنيف)
+    - output_path: مسار الحفظ (اختياري)
+    """
     try:
         df = _read_file(file_path)
         col = _detect_text_column(df, text_column)
@@ -168,15 +177,14 @@ def full_clean_pipeline(file_path: str, text_column: str = "", keep_diacritics: 
 
         diacritics_note = "تم الإبقاء على التشكيل" if keep_diacritics else "تم إزالة التشكيل"
         return (
-            f"تم تنظيف الملف بنجاح عبر خط الأنابيب الكامل "
+            f" تم تنظيف الملف بنجاح عبر خط الأنابيب الكامل "
             f"(إزالة تكرار الحروف + التطبيع + {diacritics_note}).\n"
             f"عدد الصفوف المعالجة: {len(df)}\n"
             f"الملف النهائي محفوظ في: {output_path}"
         )
 
     except Exception as e:
-        return f"خطأ أثناء التنظيف الشامل: {str(e)}"
-
+        return f" خطأ أثناء التنظيف الشامل: {str(e)}"
 
 def create_preprocessor_agent():
     llm = get_llm(temperature=0.2)
@@ -194,8 +202,8 @@ def create_preprocessor_agent():
             "تشكيلاً (مثل تحويل النص إلى كلام) والمهام التي لا تحتاجه (مثل التصنيف). "
             "تعملين بدقة ولا تتلفين البيانات الأصلية أبداً، بل تنشئين نسخاً معالجة جديدة. "
             "دائماً تستشهدين بالأرقام الفعلية اللي رجعتها الأدوات، ولا تخترعين أرقاماً "
-            "غير موجودة في نتائج الأدوات. قاعدة صارمة: إذا رجعت أي أداة نتيجة تبدأ برمز الخطأ، "
-            "يُمنع منعاً باتاً أن تكتبي في إجابتك النهائية أن العملية نجحت "
+            "غير موجودة في نتائج الأدوات. قاعدة صارمة: إذا رجعت أي أداة نتيجة تبدأ بـ  "
+            "(رمز الخطأ)، يُمنع منعاً باتاً أن تكتبي في إجابتك النهائية أن العملية نجحت "
             "أو تخترعي مساراً لملف غير موجود فعلياً. في هذه الحالة، اذكري الخطأ بصراحة "
             "واقترحي حلاً (مثل استخدام مسار افتراضي بدل تحديد مسار مخصص)."
         ),
@@ -210,8 +218,12 @@ def create_preprocessor_agent():
     )
     return agent
 
-
 def create_preprocessing_task(agent, file_path: str, task_type: str = "classification"):
+    """
+    task_type: نوع المهمة اللي رح تحدد إذا نبقّي التشكيل أو لا
+    - "classification" أو "general" → إزالة التشكيل
+    - "tts" أو "text_to_speech" → الإبقاء على التشكيل
+    """
     keep_diacritics = task_type.lower() in ["tts", "text_to_speech"]
 
     task = Task(
@@ -225,7 +237,7 @@ def create_preprocessing_task(agent, file_path: str, task_type: str = "classific
             "بعد التنظيف، اكتبي ملخصاً قصيراً بالعربية يوضح: عدد الصفوف المعالجة "
             "(استخدمي الرقم الفعلي الراجع من الأداة فقط، لا تخترعي رقماً)، "
             "أهم التغييرات اللي طبّقتيها، ومسار الملف النهائي الفعلي كما رجعته الأداة. "
-            "إذا رجعت الأداة خطأ، اذكري ذلك بصراحة في الملخص ولا تدّعي النجاح."
+            "إذا رجعت الأداة خطأ (رمز )، اذكري ذلك بصراحة في الملخص ولا تدّعي النجاح."
         ),
         expected_output=(
             "ملخص بالعربية يوضح نجاح عملية التنظيف، عدد الصفوف الفعلي المعالج، "
@@ -235,7 +247,6 @@ def create_preprocessing_task(agent, file_path: str, task_type: str = "classific
     )
     return task
 
-
 if __name__ == "__main__":
     test_file_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -243,7 +254,7 @@ if __name__ == "__main__":
     )
 
     if not os.path.exists(test_file_path):
-        print(f"الملف التجريبي غير موجود في: {test_file_path}")
+        print(f" الملف التجريبي غير موجود في: {test_file_path}")
     else:
         preprocessor = create_preprocessor_agent()
         task = create_preprocessing_task(preprocessor, test_file_path, task_type="classification")
