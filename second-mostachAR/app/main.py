@@ -91,7 +91,7 @@ with st.sidebar:
 
     st.subheader("رفع ملف بيانات")
     uploaded_file = st.file_uploader(
-        "اختاري ملف CSV, Excel, PDF, DOCX, DOC, أو TXT",
+        "اختار ملف CSV, Excel, PDF, DOCX, DOC, أو TXT",
         type=["csv", "xlsx", "xls", "txt", "pdf", "docx", "doc"],
     )
     st.divider()
@@ -141,8 +141,8 @@ if not current["messages"]:
         أهلاً بيك، أنا <b>AlmostachAR</b>، مستشارك الذكي لبناء نماذج معالجة اللغة
         العربية الطبيعية
         <br><br>
-        تقدري تسألني أي سؤال عام، أو ترفعي ملف بيانات من الشريط الجانبي
-        وتطلبي مني أفحصه، أنظفه، أقترح لك نموذج، أو أي شيء تحتاجينه
+        تقدر تسألني أي سؤال عام، أو ترفع ملف بيانات من الشريط الجانبي
+        تطلب مني أفحصه، أنظفه، أقترح لك نموذج، أو أي شيء تحتاجه
         </div>
         """,
         unsafe_allow_html=True,
@@ -153,7 +153,7 @@ for message in current["messages"]:
         st.markdown(message["content"])
 
 
-user_input = st.chat_input("اكتبي هنا...")
+user_input = st.chat_input("اكتب هنا...")
 
 if user_input:
     if current["title"] == "محادثة جديدة":
