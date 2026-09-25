@@ -50,8 +50,13 @@ if not GROQ_API_KEY:
         "تأكدي من إضافة السطر: GROQ_API_KEY=gsk_..."
     )
 
+# ملاحظة: llama-3.3-70b-versatile تم إيقافه (deprecated) من Groq بتاريخ
+# 17 يونيو 2026. النموذج الحالي الموصى به رسمياً بديلاً له لمهام النص العامة
+# ودعم استدعاء الأدوات (Tool Calling) هو openai/gpt-oss-120b.
+DEFAULT_MODEL_NAME = "groq/openai/gpt-oss-120b"
 
-def get_llm(model_name: str = "groq/llama-3.3-70b-versatile", temperature: float = 0.3):
+
+def get_llm(model_name: str = DEFAULT_MODEL_NAME, temperature: float = 0.3):
     """
     يرجع نسخة مهيأة من crewai.LLM جاهزة للاستخدام في أي وكيل.
     """

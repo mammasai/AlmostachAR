@@ -2,6 +2,7 @@
 
 import os
 import sys
+import base64
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import get_llm
@@ -14,6 +15,15 @@ from agents.preprocessor import create_preprocessor_agent, create_preprocessing_
 from agents.model_advisor import create_model_advisor_agent, create_advisory_task
 from agents.trainer import create_trainer_agent, create_training_prep_task
 from agents.evaluator import create_evaluator_agent, create_evaluation_task
+from agents.dialect_agent import run_dialect_turn, AVAILABLE_DIALECTS
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+# نموذج Groq اللي بيدعم الرؤية البصرية (Vision) بالإضافة لاستخدام الأدوات.
+# ملاحظة: llama-4-scout-17b-16e-instruct تم إيقافه (deprecated) من Groq بتاريخ
+# 17 يونيو 2026 كمان. البديل الرسمي الموصى به لمهام الرؤية هو qwen/qwen3.6-27b.
+VISION_MODEL_NAME = "groq/qwen/qwen3.6-27b"
+
 
 @tool("Delegate to Data Inspector")
 def delegate_to_inspector(file_path: str) -> str:
@@ -31,12 +41,16 @@ def delegate_to_inspector(file_path: str) -> str:
     except Exception as e:
         return f" خطأ أثناء تفويض وكيل الفحص: {str(e)}"
 
+
 @tool("Delegate to Preprocessor")
-def delegate_to_preprocessor(file_path: str, task_type: str = "classification") -> str:
+def delegate_to_preprocessor(file_path: str, task_type: str) -> str:
     """
     تستدعي وكيلة تنظيف النصوص العربية المتخصصة. استخدمي هذه الأداة لما يطلب المستخدم
     تنظيف بيانات، إزالة تشكيل، تطبيع نصوص، أو تجهيز ملف لمهمة تدريب.
-    المدخلات: file_path، task_type (مثال: 'classification' أو 'tts').
+    المدخلات (الاثنين إلزاميين، لازم تمرّريهم دايماً):
+    - file_path: مسار الملف.
+    - task_type: نوع المهمة، مثل 'classification' أو 'tts'. لو المستخدم ما
+      حدد نوع المهمة صراحة، مرّري 'classification' كقيمة افتراضية معقولة.
     """
     try:
         preprocessor = create_preprocessor_agent()
@@ -47,12 +61,15 @@ def delegate_to_preprocessor(file_path: str, task_type: str = "classification") 
     except Exception as e:
         return f" خطأ أثناء تفويض وكيل التنظيف: {str(e)}"
 
+
 @tool("Delegate to Model Advisor")
-def delegate_to_advisor(file_path: str, task_type: str = "classification") -> str:
+def delegate_to_advisor(file_path: str, task_type: str) -> str:
     """
     تستدعي المستشارة المتخصصة في اختيار النماذج اللغوية العربية. استخدمي هذه الأداة
     لما يسأل المستخدم عن أنسب نموذج (AraBERT, CAMeLBERT, MarBERT) لمهمته.
-    المدخلات: file_path، task_type.
+    المدخلات (الاثنين إلزاميين، لازم تمرّريهم دايماً):
+    - file_path: مسار الملف.
+    - task_type: نوع المهمة. لو ما حدد المستخدم، مرّري 'classification'.
     """
     try:
         advisor = create_model_advisor_agent()
@@ -63,14 +80,19 @@ def delegate_to_advisor(file_path: str, task_type: str = "classification") -> st
     except Exception as e:
         return f" خطأ أثناء تفويض وكيل الاستشارة: {str(e)}"
 
+
 @tool("Delegate to Trainer")
-def delegate_to_trainer(file_path: str, model_hf_path: str, text_column: str = "text",
-                         label_column: str = "label", num_labels: int = 2) -> str:
+def delegate_to_trainer(file_path: str, model_hf_path: str, text_column: str,
+                         label_column: str, num_labels: int) -> str:
     """
     تستدعي مهندسة التدريب المتخصصة. استخدمي هذه الأداة لما يطلب المستخدم تحضير
     بيانات للتدريب، تقسيم داتاسيت، أو توليد سكريبت تدريب (Fine-tuning) كامل.
-    المدخلات: file_path، model_hf_path (مسار النموذج على Hugging Face)،
-    text_column، label_column، num_labels.
+    المدخلات (كلها إلزامية، لازم تمرّريها دايماً، حتى لو بقيم افتراضية معقولة):
+    - file_path: مسار الملف.
+    - model_hf_path: مسار النموذج على Hugging Face (اسألي المستخدم لو ما حدده).
+    - text_column: اسم عمود النص، افتراضياً 'text' لو ما حدد المستخدم.
+    - label_column: اسم عمود التصنيف، افتراضياً 'label' لو ما حدد المستخدم.
+    - num_labels: عدد الفئات، افتراضياً 2 لو ما حدد المستخدم.
     """
     try:
         trainer = create_trainer_agent()
@@ -84,14 +106,19 @@ def delegate_to_trainer(file_path: str, model_hf_path: str, text_column: str = "
     except Exception as e:
         return f" خطأ أثناء تفويض وكيل التدريب: {str(e)}"
 
+
 @tool("Delegate to Evaluator")
-def delegate_to_evaluator(predictions_file: str, text_column: str = "text",
-                           true_label_column: str = "true_label",
-                           predicted_label_column: str = "predicted_label") -> str:
+def delegate_to_evaluator(predictions_file: str, text_column: str,
+                           true_label_column: str,
+                           predicted_label_column: str) -> str:
     """
     تستدعي محللة الأداء المتخصصة. استخدمي هذه الأداة لما يطلب المستخدم تقييم أداء
     نموذج مدرَّب، حساب مقاييس (Accuracy, F1)، أو تحليل أخطاء التصنيف.
-    المدخل: predictions_file (ملف فيه القيم الحقيقية والمتوقعة).
+    المدخلات (كلها إلزامية، لازم تمرّريها دايماً، حتى لو بقيم افتراضية معقولة):
+    - predictions_file: ملف فيه القيم الحقيقية والمتوقعة.
+    - text_column: افتراضياً 'text' لو ما حدد المستخدم.
+    - true_label_column: افتراضياً 'true_label' لو ما حدد المستخدم.
+    - predicted_label_column: افتراضياً 'predicted_label' لو ما حدد المستخدم.
     """
     try:
         evaluator = create_evaluator_agent()
@@ -105,29 +132,90 @@ def delegate_to_evaluator(predictions_file: str, text_column: str = "text",
     except Exception as e:
         return f" خطأ أثناء تفويض وكيل التقييم: {str(e)}"
 
-def create_orchestrator_agent():
-    llm = get_llm(temperature=0.4)
+
+@tool("Delegate to Dialect Agent")
+def delegate_to_dialect_agent(user_message: str, dialect: str) -> str:
+    """
+    تستدعي خبيرة اللهجات العربية المحكية عشان تردي على المستخدم بنفس لهجته.
+    استخدميها لو المستخدم كتب بلهجة عامية واضحة أو طلب الرد بلهجة معينة.
+    أمثلة كلمات تدل على اللهجة: جزائرية (واش، كيفاش، بزاف)، تونسية (شنية،
+    عسلامة، برشا)، مغربية (واخا، دابا، ديال)، مصرية (إزيك، إيه، خالص)،
+    خليجية (شلونك، وايد، الحين).
+    المدخلات: user_message (رسالة المستخدم كما هي)، dialect (وحدة من:
+    'جزائرية'، 'تونسية'، 'مغربية'، 'مصرية'، 'خليجية' — بالضبط بهذا الشكل).
+    """
+    try:
+        if dialect not in AVAILABLE_DIALECTS:
+            available = "، ".join(AVAILABLE_DIALECTS)
+            return f"لهجة غير مدعومة. اللهجات المتاحة حالياً: {available}"
+        return run_dialect_turn(user_message=user_message, dialect=dialect)
+    except Exception as e:
+        return f" خطأ أثناء تفويض وكيلة اللهجات: {str(e)}"
+
+
+@tool("Analyze Image")
+def analyze_image(image_path: str, question: str = "شو اللي تشوفينه في هذي الصورة؟ جاوبي بأسلوب محادثة طبيعي ومباشر، فقرة أو فقرتين قصار، من غير عناوين أو نقاط أو ترقيم.") -> str:
+    """
+    تحلّل صورة مرفوعة من المستخدم بصرياً وتصف محتواها أو تجاوب عن سؤال محدد بخصوصها،
+    باستخدام نموذج رؤية حاسوبية (Vision). استخدمي هذه الأداة أي وقت المستخدم يرفع
+    صورة (png, jpg, jpeg, webp) ويسأل عنها أو يطلب وصفها/تحليلها.
+    المدخلات: image_path (مسار الصورة الكامل الموجود على القرص)،
+    question (سؤال محدد عن الصورة، اختياري — افتراضياً وصف عام).
+    """
+    try:
+        if not image_path or not os.path.exists(image_path):
+            return f"لم أجد الصورة في المسار: {image_path}"
+
+        ext = os.path.splitext(image_path)[1].lower()
+        if ext not in IMAGE_EXTENSIONS:
+            return f"الملف '{image_path}' مش صورة مدعومة (المسموح: png, jpg, jpeg, webp)."
+
+        mime = "jpeg" if ext in (".jpg", ".jpeg") else ext.lstrip(".")
+
+        with open(image_path, "rb") as f:
+            b64_data = base64.b64encode(f.read()).decode("utf-8")
+
+        # نستخدم نموذج Vision مباشرة عبر crewai.LLM.call بدل الاعتماد على
+        # multimodal=True في CrewAI (فيها مشاكل معروفة بتعامل الصورة كنص عادي).
+        vision_llm = get_llm(model_name=VISION_MODEL_NAME, temperature=0.3)
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/{mime};base64,{b64_data}"},
+                    },
+                ],
+            }
+        ]
+
+        response = vision_llm.call(messages=messages)
+        return str(response)
+    except Exception as e:
+        return f" خطأ أثناء تحليل الصورة: {str(e)}"
+
+
+def create_orchestrator_agent(temperature: float = 0.4):
+    llm = get_llm(temperature=temperature)
 
     agent = Agent(
         role="المستشار الرئيسي لـ AlmostachAR",
         goal=(
-            "التحدث مع المستخدم بشكل طبيعي وودود كمساعد محادثة، وفهم قصده بدقة، "
-            "ثم اتخاذ القرار الصحيح: إما الإجابة مباشرة إذا كان السؤال عاماً "
-            "(مثل شرح مفهوم في Arabic NLP)، أو تفويض المهمة للوكيل المتخصص المناسب "
-            "إذا كانت تتطلب فحص أو معالجة أو تحليل ملف بيانات فعلي."
+            "مساعدة المستخدم بمعالجة اللغة العربية الطبيعية: أجيبي مباشرة على "
+            "الأسئلة العامة بالفصحى، أو استخدمي الأداة المناسبة عند الحاجة "
+            "الفعلية (بيانات، صورة، أو رد بلهجة عامية)."
         ),
         backstory=(
-            "أنتِ الواجهة الرئيسية لمنصة AlmostachAR — مستشار ذكاء اصطناعي متكامل "
-            "لهندسة معالجة اللغة العربية الطبيعية. عندك فريق من خمس خبيرات متخصصات "
-            "تحت إمرتك: خبيرة فحص البيانات، خبيرة تنظيف النصوص، مستشارة اختيار "
-            "النماذج، مهندسة التدريب، ومحللة الأداء. مهمتك إنك تكوني الوسيطة الذكية: "
-            "لما المستخدم يسأل سؤال عام (مثلاً 'شنو الفرق بين AraBERT وCAMeLBERT؟')، "
-            "جاوبي مباشرة من معرفتك بدون ما تستدعي أي أداة. لكن لما المستخدم يطلب "
-            "عملية فعلية على ملف (فحص، تنظيف، تدريب، تقييم)، استخدمي أداة التفويض "
-            "المناسبة واستدعي الخبيرة المختصة. لو الطلب يحتاج أكثر من خبيرة بالتسلسل "
-            "(مثلاً فحص ثم تنظيف)، استدعيهم وحدة وحدة بالترتيب المنطقي. تحدثي دائماً "
-            "بالعربية بأسلوب طبيعي ومباشر، ولخصي تقارير الخبيرات بشكل واضح ومفهوم "
-            "للمستخدم بدل نسخها حرفياً بكل تفاصيلها التقنية."
+            "مستشارة ذكاء اصطناعي لهندسة NLP العربي. عندك أدوات لفحص/تنظيف "
+            "البيانات، اختيار النماذج، التدريب، التقييم، تحليل الصور، والرد "
+            "بلهجة عامية (جزائرية/تونسية/مغربية/مصرية/خليجية) لو المستخدم "
+            "كتب بلهجة. جاوبي بالفصحى مباشرة على أي سؤال عام بدون أدوات. "
+            "استخدمي أداة فقط لما الطلب يحتاج فعلياً ملف بيانات، صورة "
+            "مرفوعة، أو المستخدم يكتب/يطلب لهجة معينة — حتى بدون طلب صريح "
+            "لو لاحظتِ لهجة واضحة بكلامه. لخّصي نتائج الأدوات بإيجاز طبيعي."
         ),
         tools=[
             delegate_to_inspector,
@@ -135,53 +223,98 @@ def create_orchestrator_agent():
             delegate_to_advisor,
             delegate_to_trainer,
             delegate_to_evaluator,
+            delegate_to_dialect_agent,
+            analyze_image,
         ],
         llm=llm,
         verbose=True,
     )
     return agent
 
+
 def create_chat_task(agent, user_message: str, conversation_history: str = "",
-                      file_path: str = ""):
+                      file_path: str = "", depth: str = "مفصل", specialty_hint: str = ""):
     """
     ينشئ مهمة محادثة واحدة بناءً على رسالة المستخدم الحالية، مع سياق المحادثة
-    السابقة (اختياري) ومسار ملف مرفوع (اختياري) إن وُجد.
+    السابقة (اختياري)، مسار ملف مرفوع (اختياري)، عمق الإجابة المطلوب
+    (موجز/مفصل)، وتلميح تخصص اختياري يفضّله المستخدم حالياً.
     """
     context_section = ""
     if conversation_history:
         context_section += f"\nسياق المحادثة السابقة (للاستئناس فقط):\n{conversation_history}\n"
+
+    if specialty_hint:
+        context_section += f"\nالمستخدم مركّز حالياً على: {specialty_hint} (استأنسي بهذا، بدون ما تتجاهلي طلبه الفعلي لو كان مختلف).\n"
+
     if file_path:
-        context_section += f"\nملف مرفوع من المستخدم متاح في هذا المسار: {file_path}\n"
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in IMAGE_EXTENSIONS:
+            context_section += (
+                f"\nالمستخدم رفع صورة متاحة في هذا المسار: {file_path}\n"
+                "لو سؤاله يخص هذي الصورة أو طلب وصفها/تحليلها، استخدمي أداة "
+                "'Analyze Image' مباشرة بالمسار أعلاه.\n"
+            )
+        else:
+            context_section += f"\nملف مرفوع من المستخدم متاح في هذا المسار: {file_path}\n"
+
+    depth_instruction = (
+        "أجيبي بإيجاز شديد (جملتين لثلاث جمل بحد أقصى)، بدون تفاصيل زايدة."
+        if depth == "موجز"
+        else "أجيبي بتفصيل كافٍ يغطي النقاط المهمة بشكل واضح ومنظم."
+    )
 
     task = Task(
         description=(
             f"رسالة المستخدم الحالية: \"{user_message}\"\n"
             f"{context_section}\n"
+            f"مستوى التفصيل المطلوب: {depth_instruction}\n\n"
             "افهمي قصد المستخدم وردي بشكل طبيعي ومباشر. إذا كان السؤال عاماً، "
             "جاوبي من معرفتك مباشرة بدون استخدام أي أداة. إذا كان الطلب يتطلب "
             "عملية فعلية على ملف بيانات، استخدمي أداة التفويض المناسبة "
             "(تأكدي من وجود مسار ملف صالح قبل الاستدعاء؛ لو ما فيش ملف مرفوع "
-            "واحتجتيه، اطلبي من المستخدم رفعه بدل افتراض مسار وهمي)."
+            "واحتجتيه، اطلبي من المستخدم رفعه بدل افتراض مسار وهمي). إذا كان "
+            "الملف المرفوع صورة، استخدمي أداة تحليل الصور بدل أدوات البيانات."
         ),
         expected_output=(
             "رد طبيعي ومباشر بالعربية، مناسب لواجهة محادثة، يجاوب على طلب "
-            "المستخدم أو يلخص نتيجة الوكيل المتخصص المُستدعى بشكل مفهوم."
+            "المستخدم أو يلخص نتيجة الوكيل المتخصص أو تحليل الصورة بشكل مفهوم، "
+            "وبمستوى التفصيل المطلوب."
         ),
         agent=agent,
     )
     return task
 
+
+import re
 import time
 
+
+def _parse_retry_wait_seconds(error_text: str, default_wait: int) -> int:
+    """
+    Groq بيرجع بنص الخطأ وقت الانتظار الفعلي المطلوب، مثلاً:
+    'Please try again in 6m 11.52s'. نحاول نقرأه عشان ننتظر بالضبط
+    المدة الصحيحة بدل رقم ثابت تخميني.
+    """
+    match = re.search(r"try again in (?:(\d+)m)?\s*([\d.]+)s", error_text)
+    if match:
+        minutes = int(match.group(1)) if match.group(1) else 0
+        seconds = float(match.group(2))
+        return int(minutes * 60 + seconds) + 2  # هامش أمان بسيط
+    return default_wait
+
+
 def run_chat_turn(user_message: str, conversation_history: str = "", file_path: str = "",
-                   max_retries: int = 3, retry_wait_seconds: int = 15):
+                   temperature: float = 0.4, depth: str = "مفصل", specialty_hint: str = "",
+                   max_retries: int = 4, retry_wait_seconds: int = 20):
     """
     نقطة الدخول الرئيسية: تشغّل دورة محادثة واحدة وترجع رد المدير كنص.
     تُستخدم مباشرة من واجهة Streamlit. تعيد المحاولة تلقائياً عند تجاوز حد
-    الاستخدام (Rate Limit) من Groq بدل ما تفشل مباشرة.
+    الاستخدام (Rate Limit) من Groq، وتحترم وقت الانتظار الفعلي اللي يطلبه
+    Groq نفسه بدل انتظار ثابت.
     """
-    orchestrator = create_orchestrator_agent()
-    task = create_chat_task(orchestrator, user_message, conversation_history, file_path)
+    orchestrator = create_orchestrator_agent(temperature=temperature)
+    task = create_chat_task(orchestrator, user_message, conversation_history, file_path,
+                             depth=depth, specialty_hint=specialty_hint)
     crew = Crew(agents=[orchestrator], tasks=[task], verbose=True)
 
     last_error = None
@@ -195,17 +328,20 @@ def run_chat_turn(user_message: str, conversation_history: str = "", file_path: 
             is_rate_limit = "RateLimitError" in error_text or "rate_limit" in error_text.lower()
 
             if is_rate_limit and attempt < max_retries:
-                time.sleep(retry_wait_seconds)
+                wait_time = _parse_retry_wait_seconds(error_text, retry_wait_seconds)
+                time.sleep(wait_time)
                 continue
             else:
                 break
 
     if last_error and ("RateLimitError" in last_error or "rate_limit" in last_error.lower()):
         return (
-            "⏳ عذراً، وصلنا لحد الاستخدام المسموح مؤقتاً من مزوّد النموذج (Groq). "
-            "جربي تبعتي رسالتك مرة أخرى بعد دقيقة تقريباً."
+            "⏳ عذراً، وصلنا لحد الاستخدام المسموح مؤقتاً من مزوّد النموذج (Groq) "
+            "(الخطة المجانية محدودة جداً بعدد التوكنات بالدقيقة). جربي تبعتي "
+            "رسالتك مرة أخرى بعد دقيقة تقريباً."
         )
     return f" حدث خطأ غير متوقع: {last_error}"
+
 
 if __name__ == "__main__":
     print(" AlmostachAR — وضع المحادثة التجريبي (اكتبي 'خروج' للإنهاء)\n")
